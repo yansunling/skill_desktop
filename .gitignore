@@ -1,3 +1,54 @@
-node_modules
+# ===================== Rust 编译产物 =====================
 target/
-\*\*/target/
+Cargo.lock
+
+# ===================== Tauri 打包产物 =====================
+src-tauri/target/
+src-tauri/bundle/
+src-tauri/.tauri-build/
+src-tauri/gen/
+
+# Tauri 临时缓存
+src-tauri/.tmp/
+
+# ===================== 前端（Vite/Vue/React）通用 =====================
+node_modules/
+dist/
+dist-electron/
+.pnp
+.pnp.js
+coverage/
+*.local
+.env
+.env.local
+.env.development
+.env.production
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ===================== IDE 配置文件 =====================
+# VS Code
+.vscode/
+*.code-workspace
+# Idea
+.idea/
+*.iml
+out/
+# RustRover
+.rustrover/
+
+# ===================== 系统、编辑器临时文件 =====================
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+$RECYCLE.BIN/
+
+# ===================== 日志、缓存 =====================
+logs/
+*.log
+*.out
+cache/
