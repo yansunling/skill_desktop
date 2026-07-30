@@ -454,6 +454,7 @@ export default function App() {
                           <div className="modal-skill-copy">
                             <strong>{skill.meta.name || skill.meta.id}</strong>
                             <span>{skill.meta.id}</span>
+                            <span className="modal-skill-path">{skill.sourcePath || "未记录绝对路径"}</span>
                           </div>
                           {skill.lastSyncResult ? (
                             <span className="tag target-status-tag">{skill.lastSyncResult}</span>

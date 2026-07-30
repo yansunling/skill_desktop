@@ -49,6 +49,10 @@ export function SyncPanel({
           <span className="summary-label">技能说明</span>
           <span>{selectedSkill?.meta.description || "当前未选择技能或没有填写说明。"}</span>
         </div>
+        <div className="summary-row">
+          <span className="summary-label">技能路径</span>
+          <span className="path-value">{selectedSkill?.sourcePath || "当前未选择技能或尚未记录来源路径。"}</span>
+        </div>
         <div className="sync-actions current-skill-actions">
           <button
             type="button"

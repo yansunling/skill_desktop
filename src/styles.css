@@ -246,6 +246,15 @@ button:disabled {
   font-size: 12px;
 }
 
+.modal-skill-path,
+.path-value {
+  display: block;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+  color: #516274;
+  font-size: 12px;
+}
+
 .skill-item-tags,
 .sync-actions,
 .modal-toolbar,
