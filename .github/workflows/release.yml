@@ -1,0 +1,190 @@
+name: Release Build and Publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  create_release:
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      release_id: ${{ steps.create_release.outputs.id }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: ${{ github.ref_name }}
+          body: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  build-linux:
+    needs: create_release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Install deps
+        run: npm ci
+      - name: Build frontend + tauri
+        run: |
+          npm run build
+          npx tauri build
+      - name: Prepare release asset
+        run: |
+          mkdir -p release-assets
+          # find AppImage or linux bundle
+          FILE=$(find src-tauri/target -type f -name "*.AppImage" -print -quit)
+          if [ -z "$FILE" ]; then
+            FILE=$(find src-tauri/target -type f -name "*linux*" -print -quit)
+          fi
+          cp "$FILE" release-assets/skill-manager-linux.AppImage
+      - name: Upload Linux asset
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: release-assets/skill-manager-linux.AppImage
+          asset_name: skill-manager-linux.AppImage
+          asset_content_type: application/octet-stream
+
+  build-windows:
+    needs: create_release
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Install deps
+        run: npm ci
+      - name: Build frontend + tauri
+        run: |
+          npm run build
+          npx tauri build
+      - name: Sign Windows installer (optional)
+        if: ${{ secrets.WINDOWS_SIGNING_PFX }}
+        shell: powershell
+        run: |
+          Write-Host "Signing installer using provided PFX..."
+          $pfxPath = "${{ runner.temp }}\codesign.pfx"
+          [System.IO.File]::WriteAllBytes($pfxPath, [System.Convert]::FromBase64String($env:WINDOWS_SIGNING_PFX))
+          $pwd = ConvertTo-SecureString $env:WINDOWS_SIGNING_PASSWORD -AsPlainText -Force
+          Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My -Password $pwd | Out-Null
+          $file = Get-ChildItem -Path src-tauri\target -Recurse -File | Where-Object { $_.Name -match "(exe|msi|msix|nsis)" } | Select-Object -First 1
+          if ($null -eq $file) { Write-Host "No installer file found to sign"; exit 0 }
+          $signtool = (Get-Command signtool.exe -ErrorAction SilentlyContinue).Source
+          if (-not $signtool) { Write-Host "signtool not found in PATH"; exit 1 }
+          & $signtool sign /fd SHA256 /a /f $pfxPath /p $env:WINDOWS_SIGNING_PASSWORD $file.FullName
+      - name: Prepare release asset (Windows)
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path release-assets
+          $file = Get-ChildItem -Path src-tauri\target -Recurse -File | Where-Object { $_.Name -match "(exe|msi|msix|nsis)" } | Select-Object -First 1
+          Copy-Item $file.FullName -Destination release-assets\skill-manager-setup.exe
+      - name: Upload Windows asset
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: release-assets/skill-manager-setup.exe
+          asset_name: skill-manager-setup.exe
+          asset_content_type: application/octet-stream
+
+  build-macos:
+    needs: create_release
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Install deps
+        run: npm ci
+      - name: Build frontend + tauri
+        run: |
+          npm run build
+          npx tauri build
+      - name: Import macOS signing cert (optional)
+        if: ${{ secrets.MAC_SIGNING_P12 }}
+        uses: apple-actions/import-codesign-certs@v1
+        with:
+          p12-base64: ${{ secrets.MAC_SIGNING_P12 }}
+          p12-password: ${{ secrets.MAC_SIGNING_P12_PASSWORD }}
+          keychain-password: ${{ secrets.MAC_KEYCHAIN_PASSWORD }}
+      - name: Notarize macOS artifact (optional)
+        if: ${{ secrets.APPLE_ID && secrets.APPLE_PASSWORD }}
+        uses: apple-actions/notarize-app@v1
+        with:
+          app-path: "$(find src-tauri/target -type f -name '*.dmg' -print -quit)"
+          apple-id: ${{ secrets.APPLE_ID }}
+          password: ${{ secrets.APPLE_PASSWORD }}
+      - name: Prepare release asset (macOS)
+        run: |
+          mkdir -p release-assets
+          FILE=$(find src-tauri/target -type f -name "*.dmg" -print -quit)
+          if [ -z "$FILE" ]; then
+            FILE=$(find src-tauri/target -type f -name "*mac*" -print -quit)
+          fi
+          cp "$FILE" release-assets/skill-manager-macos.dmg
+      - name: Upload macOS asset
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: release-assets/skill-manager-macos.dmg
+          asset_name: skill-manager-macos.dmg
+          asset_content_type: application/octet-stream
+
+  publish-manifest:
+    needs: [build-linux, build-windows, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create latest.json
+        run: |
+          mkdir -p release-assets
+          TAG=${{ github.ref_name }}
+          REPO=${{ github.repository }}
+          OWNER=$(echo "$REPO" | cut -d'/' -f1)
+          REPO_NAME=$(echo "$REPO" | cut -d'/' -f2)
+          PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          cat > release-assets/latest.json <<EOF
+{
+  "version": "${TAG}",
+  "notes": "Release ${TAG}",
+  "pub_date": "${PUB_DATE}",
+  "platforms": {
+    "windows": { "url": "https://github.com/${REPO}/releases/download/${TAG}/skill-manager-setup.exe" },
+    "macos": { "url": "https://github.com/${REPO}/releases/download/${TAG}/skill-manager-macos.dmg" },
+    "linux": { "url": "https://github.com/${REPO}/releases/download/${TAG}/skill-manager-linux.AppImage" }
+  }
+}
+EOF
+      - name: Upload latest.json
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: release-assets/latest.json
+          asset_name: latest.json
+          asset_content_type: application/json
