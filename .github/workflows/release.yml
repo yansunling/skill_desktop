@@ -79,20 +79,7 @@ jobs:
         run: |
           npm run build
           npx tauri build
-      - name: Sign Windows installer (optional)
-        if: ${{ secrets.WINDOWS_SIGNING_PFX }}
-        shell: powershell
-        run: |
-          Write-Host "Signing installer using provided PFX..."
-          $pfxPath = "${{ runner.temp }}\codesign.pfx"
-          [System.IO.File]::WriteAllBytes($pfxPath, [System.Convert]::FromBase64String($env:WINDOWS_SIGNING_PFX))
-          $pwd = ConvertTo-SecureString $env:WINDOWS_SIGNING_PASSWORD -AsPlainText -Force
-          Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My -Password $pwd | Out-Null
-          $file = Get-ChildItem -Path src-tauri\target -Recurse -File | Where-Object { $_.Name -match "(exe|msi|msix|nsis)" } | Select-Object -First 1
-          if ($null -eq $file) { Write-Host "No installer file found to sign"; exit 0 }
-          $signtool = (Get-Command signtool.exe -ErrorAction SilentlyContinue).Source
-          if (-not $signtool) { Write-Host "signtool not found in PATH"; exit 1 }
-          & $signtool sign /fd SHA256 /a /f $pfxPath /p $env:WINDOWS_SIGNING_PASSWORD $file.FullName
+      # Optional Windows signing removed to avoid secrets usage in workflow expressions
       - name: Prepare release asset (Windows)
         shell: powershell
         run: |
@@ -126,20 +113,7 @@ jobs:
         run: |
           npm run build
           npx tauri build
-      - name: Import macOS signing cert (optional)
-        if: ${{ secrets.MAC_SIGNING_P12 }}
-        uses: apple-actions/import-codesign-certs@v1
-        with:
-          p12-base64: ${{ secrets.MAC_SIGNING_P12 }}
-          p12-password: ${{ secrets.MAC_SIGNING_P12_PASSWORD }}
-          keychain-password: ${{ secrets.MAC_KEYCHAIN_PASSWORD }}
-      - name: Notarize macOS artifact (optional)
-        if: ${{ secrets.APPLE_ID && secrets.APPLE_PASSWORD }}
-        uses: apple-actions/notarize-app@v1
-        with:
-          app-path: "$(find src-tauri/target -type f -name '*.dmg' -print -quit)"
-          apple-id: ${{ secrets.APPLE_ID }}
-          password: ${{ secrets.APPLE_PASSWORD }}
+      # Optional macOS signing/notarize removed to avoid secrets usage in workflow expressions
       - name: Prepare release asset (macOS)
         run: |
           mkdir -p release-assets
