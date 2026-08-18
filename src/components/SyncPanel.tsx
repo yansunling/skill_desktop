@@ -1,5 +1,6 @@
 import type { SyncTarget, WorkspaceSkill } from "../types/skill";
 import type { SyncConflictState, SyncTargetStatus } from "../types/sync";
+import useAutoUpdate from "../hooks/useAutoUpdate";
 
 interface SyncPanelProps {
   selectedSkill: WorkspaceSkill | null;
@@ -24,12 +25,32 @@ export function SyncPanel({
   onOverwriteSync,
   onDismissConflict
 }: SyncPanelProps) {
+  const { check, install } = useAutoUpdate();
+
+  const handleCheckUpdate = async () => {
+    const res = await check();
+    if (res.shouldUpdate) {
+      // 简单提示后直接安装；可改为弹窗让用户确认
+      // eslint-disable-next-line no-alert
+      if (confirm("检测到新版本，是否现在安装并重启？")) {
+        await install();
+      }
+    } else {
+      // eslint-disable-next-line no-alert
+      alert("当前已是最新版本");
+    }
+  };
   return (
     <aside className="panel sync-panel">
       <div className="panel-header">
         <div>
           <h2>同步面板</h2>
           <p className="panel-desc">选中左侧导入技能后，可直接同步到 Codex 或 Claude。</p>
+        </div>
+        <div className="panel-actions">
+          <button type="button" className="ghost-button" onClick={handleCheckUpdate}>
+            检查更新
+          </button>
         </div>
       </div>
       <div className="summary-card current-skill-card">
