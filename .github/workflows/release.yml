@@ -166,21 +166,8 @@ jobs:
           mkdir -p release-assets
           TAG=${{ github.ref_name }}
           REPO=${{ github.repository }}
-          OWNER=$(echo "$REPO" | cut -d'/' -f1)
-          REPO_NAME=$(echo "$REPO" | cut -d'/' -f2)
           PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          cat > release-assets/latest.json <<EOF
-{
-  "version": "${TAG}",
-  "notes": "Release ${TAG}",
-  "pub_date": "${PUB_DATE}",
-  "platforms": {
-    "windows": { "url": "https://github.com/${REPO}/releases/download/${TAG}/skill-manager-setup.exe" },
-    "macos": { "url": "https://github.com/${REPO}/releases/download/${TAG}/skill-manager-macos.dmg" },
-    "linux": { "url": "https://github.com/${REPO}/releases/download/${TAG}/skill-manager-linux.AppImage" }
-  }
-}
-EOF
+          echo "{\"version\":\"$TAG\",\"notes\":\"Release $TAG\",\"pub_date\":\"$PUB_DATE\",\"platforms\":{\"windows\":{\"url\":\"https://github.com/$REPO/releases/download/$TAG/skill-manager-setup.exe\"},\"macos\":{\"url\":\"https://github.com/$REPO/releases/download/$TAG/skill-manager-macos.dmg\"},\"linux\":{\"url\":\"https://github.com/$REPO/releases/download/$TAG/skill-manager-linux.AppImage\"}}}" > release-assets/latest.json
       - name: Upload latest.json
         uses: actions/upload-release-asset@v1
         with:
