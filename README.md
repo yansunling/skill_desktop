@@ -2,38 +2,39 @@
 
 这是一个基于 Tauri 的桌面应用，用于管理和同步技能到 Codex / Claude。仓库包含前端 React + Tauri 后端（Rust）。
 
-自动更新支持
-----------------
-项目已集成 Tauri Updater 支持，配置文件在 `src-tauri/tauri.conf.json`，默认指向 GitHub Releases 的 `latest.json`：
+## 自动更新
 
-- 请确保你在发布 Release 时包含 `latest.json`（工作流已经在 `.github/workflows/release.yml` 中自动生成并上传）。
+程序启动后自动检查 GitHub Releases。发现新版本时显示版本说明，用户确认后下载、校验签名、安装并重启。
 
-证书编码与 Secrets
----------------------
-仓库内提供了用于将证书转为 Base64 的脚本，方便把证书内容安全地存为 GitHub Actions Secrets：
+更新地址配置在 `src-tauri/tauri.conf.json`。`.github/workflows/release.yml` 在推送版本标签后构建 Windows 安装包、签名 updater 产物并生成 `latest.json`。
 
-- `scripts/encode_cert.sh` — Linux/macOS
-- `scripts/encode_cert.ps1` — Windows PowerShell
-- `scripts/README.md` — 使用示例和 gh CLI 上传命令
+首次发布前，在本地生成 Tauri updater 密钥：
 
-把证书转 Base64 后，按 workflow 需要将其保存为下列 Secrets：
-
-- `WINDOWS_SIGNING_PFX`
-- `WINDOWS_SIGNING_PASSWORD`
-- `MAC_SIGNING_P12`
-- `MAC_SIGNING_P12_PASSWORD`
-- `MAC_KEYCHAIN_PASSWORD`
-- `APPLE_ID`
-- `APPLE_PASSWORD`
-
-如何触发 Release（快速演示）
---------------------------------
-在本地创建并推送 tag 能触发 CI：
-
-```bash
-# 创建签名 tag
-git tag v0.1.0
-git push origin v0.1.0
+```powershell
+npx tauri signer generate -w $env:USERPROFILE\.tauri\skill-manager.key
 ```
 
-这会触发 `.github/workflows/release.yml`，构建并上传平台安装包与 `latest.json`。
+然后：
+
+1. 将命令输出的公钥写入 `src-tauri/tauri.conf.json` 的 `tauri.updater.pubkey`。
+2. 将私钥文件完整内容保存为 GitHub Secret `TAURI_PRIVATE_KEY`。
+3. 若生成密钥时设置了密码，将密码保存为 GitHub Secret `TAURI_KEY_PASSWORD`；无密码时创建空值即可。
+
+私钥不可提交到仓库。当前配置中的公钥必须与 GitHub Secret 中的私钥配对，否则客户端会拒绝安装更新。
+
+## 发布新版本
+
+先同步修改以下三个版本号，且版本必须高于已安装版本：
+
+- `package.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/tauri.conf.json`
+
+提交后创建并推送同版本标签：
+
+```bash
+git tag v0.1.1
+git push origin v0.1.1
+```
+
+工作流会创建 GitHub Release，并上传 MSI、updater 签名包及 `latest.json`。

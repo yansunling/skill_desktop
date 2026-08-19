@@ -1,28 +1,21 @@
 import { useCallback } from "react";
-import { checkUpdate, installUpdate } from "@tauri-apps/api/updater";
+import { relaunch } from "@tauri-apps/api/process";
+import { checkUpdate, installUpdate, type UpdateManifest } from "@tauri-apps/api/updater";
 
 export type UpdateCheckResult = {
   shouldUpdate: boolean;
-  manifest?: any;
+  manifest?: UpdateManifest;
 };
 
 export function useAutoUpdate() {
   const check = useCallback(async (): Promise<UpdateCheckResult> => {
-    try {
-      const res = await checkUpdate();
-      return { shouldUpdate: res.shouldUpdate, manifest: res.manifest };
-    } catch (e) {
-      console.warn("update: check failed", e);
-      return { shouldUpdate: false };
-    }
+    const result = await checkUpdate();
+    return { shouldUpdate: result.shouldUpdate, manifest: result.manifest };
   }, []);
 
   const install = useCallback(async () => {
-    try {
-      await installUpdate();
-    } catch (e) {
-      console.warn("update: install failed", e);
-    }
+    await installUpdate();
+    await relaunch();
   }, []);
 
   return { check, install };

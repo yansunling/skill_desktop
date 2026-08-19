@@ -8,11 +8,19 @@
   },
   "package": {
     "productName": "技能管理器",
-    "version": "0.1.0"
+    "version": "0.1.1"
   },
   "tauri": {
     "bundle": {
-      "identifier": "com.codex.skill-manager"
+      "active": true,
+      "targets": ["msi", "updater"],
+      "identifier": "com.codex.skill-manager",
+      "icon": ["icons/icon.ico"],
+      "windows": {
+        "wix": {
+          "language": "zh-CN"
+        }
+      }
     },
     "allowlist": {
       "all": false,
@@ -24,10 +32,9 @@
       },
       "path": {
         "all": true
-      }
-      ,
-      "updater": {
-        "all": true
+      },
+      "process": {
+        "relaunch": true
       }
     },
     "windows": [
@@ -37,11 +44,11 @@
         "height": 820,
         "resizable": true
       }
-    ]
-    ,
+    ],
     "updater": {
       "active": true,
       "dialog": false,
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEZBQ0M3REJFOEQzODhDRTAKUldUZ2pEaU52bjNNK2xiMFNNQjAzTVZVVEJVMkhCd1p6WHBIRGJGeEJDV2ljcEQxeFFSeStPOWwK",
       "endpoints": [
         "https://github.com/yansunling/skill_desktop/releases/latest/download/latest.json"
       ]

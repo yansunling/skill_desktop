@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import type { UpdateManifest } from "@tauri-apps/api/updater";
 import { ActivityLog } from "./components/ActivityLog";
 import { SkillList } from "./components/SkillList";
 import { SyncPanel } from "./components/SyncPanel";
+import { useAutoUpdate } from "./hooks/useAutoUpdate";
 import {
   bootstrapApp,
   deleteTargetSkills,
@@ -19,6 +21,7 @@ type SyncTarget = "codex" | "claude";
 type ModalMode = "sync" | "delete";
 
 export default function App() {
+  const { check: checkForUpdate, install: installUpdate } = useAutoUpdate();
   const [targets, setTargets] = useState<SyncTargetStatus[]>([]);
   const [logs, setLogs] = useState<SyncLogEntry[]>([]);
   const [skills, setSkills] = useState<WorkspaceSkill[]>([]);
@@ -34,6 +37,8 @@ export default function App() {
   const [currentSyncTarget, setCurrentSyncTarget] = useState<SyncTarget | null>(null);
   const [modalFilter, setModalFilter] = useState("");
   const [modalMode, setModalMode] = useState<ModalMode | null>(null);
+  const [availableUpdate, setAvailableUpdate] = useState<UpdateManifest | null>(null);
+  const [isInstallingUpdate, setIsInstallingUpdate] = useState(false);
 
   useEffect(() => {
     bootstrapApp()
@@ -51,10 +56,38 @@ export default function App() {
       });
   }, []);
 
+  useEffect(() => {
+    checkForUpdate()
+      .then((result) => {
+        if (result.shouldUpdate && result.manifest) {
+          setAvailableUpdate(result.manifest);
+          appendLog("info", `发现新版本 ${result.manifest.version}，等待安装。`);
+        }
+      })
+      .catch((error) => {
+        appendLog("warning", `检查更新失败：${String(error)}`);
+      });
+  }, [checkForUpdate]);
+
   const selectedSkill = skills.find((skill) => skill.meta.id === selectedSkillId) ?? null;
 
   function appendLog(level: SyncLogEntry["level"], message: string) {
     setLogs((current) => [{ timestamp: new Date().toISOString(), level, message }, ...current].slice(0, 100));
+  }
+
+  async function handleInstallUpdate() {
+    if (!availableUpdate || isInstallingUpdate) {
+      return;
+    }
+
+    setIsInstallingUpdate(true);
+    appendLog("info", `正在安装版本 ${availableUpdate.version}。`);
+    try {
+      await installUpdate();
+    } catch (error) {
+      appendLog("error", `自动更新失败：${String(error)}`);
+      setIsInstallingUpdate(false);
+    }
   }
 
   async function handleImportFolder() {
@@ -348,6 +381,32 @@ export default function App() {
           <p className="hero-subtitle">先导入本次会话要用的技能，再同步到 Codex 或 Claude。</p>
         </div>
       </header>
+      {availableUpdate ? (
+        <section className="update-banner" aria-live="polite">
+          <div>
+            <strong>发现新版本 {availableUpdate.version}</strong>
+            <span>{availableUpdate.body || "新版本已可以安装。"}</span>
+          </div>
+          <div className="update-actions">
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => setAvailableUpdate(null)}
+              disabled={isInstallingUpdate}
+            >
+              稍后
+            </button>
+            <button
+              type="button"
+              className="primary-button"
+              onClick={handleInstallUpdate}
+              disabled={isInstallingUpdate}
+            >
+              {isInstallingUpdate ? "正在更新..." : "立即更新并重启"}
+            </button>
+          </div>
+        </section>
+      ) : null}
       {isLoading ? (
         <section className="panel loading-panel">正在初始化同步工具...</section>
       ) : (

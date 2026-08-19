@@ -1,152 +1,51 @@
-name: Release Build and Publish
+name: Release
 
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
+
+permissions:
+  contents: write
 
 jobs:
-  create_release:
-    runs-on: ubuntu-latest
-    outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
-      release_id: ${{ steps.create_release.outputs.id }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Create GitHub Release (via curl)
-        id: create_release
-        run: |
-          TAG=${GITHUB_REF_NAME:-${{ github.ref_name }}}
-          REPO=${{ github.repository }}
-          BODY="Release $TAG"
-          RESP=$(curl -s -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$REPO/releases" -d "{\"tag_name\":\"$TAG\",\"name\":\"$TAG\",\"body\":\"$BODY\",\"draft\":false,\"prerelease\":false}")
-          UPLOAD_URL=$(echo "$RESP" | python -c "import sys,json; print(json.load(sys.stdin).get('upload_url',''))")
-          ID=$(echo "$RESP" | python -c "import sys,json; print(json.load(sys.stdin).get('id',''))")
-          echo "upload_url=$UPLOAD_URL" >> $GITHUB_OUTPUT
-          echo "id=$ID" >> $GITHUB_OUTPUT
-
-  build-linux:
-    needs: create_release
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-      - name: Setup Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-      - name: Install deps
-        run: npm ci
-      - name: Build frontend + tauri
-        run: |
-          npm run build
-          npx tauri build
-      - name: Prepare release asset
-        run: |
-          mkdir -p release-assets
-          # find AppImage or linux bundle
-          FILE=$(find src-tauri/target -type f -name "*.AppImage" -print -quit)
-          if [ -z "$FILE" ]; then
-            FILE=$(find src-tauri/target -type f -name "*linux*" -print -quit)
-          fi
-          cp "$FILE" release-assets/skill-manager-linux.AppImage
-      - name: Upload Linux asset
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ needs.create_release.outputs.upload_url }}
-          asset_path: release-assets/skill-manager-linux.AppImage
-          asset_name: skill-manager-linux.AppImage
-          asset_content_type: application/octet-stream
-
-  build-windows:
-    needs: create_release
+  publish-windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Setup Node
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-      - name: Setup Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-      - name: Install deps
-        run: npm ci
-      - name: Build frontend + tauri
-        run: |
-          npm run build
-          npx tauri build
-      # Optional Windows signing removed to avoid secrets usage in workflow expressions
-      - name: Prepare release asset (Windows)
-        shell: powershell
-        run: |
-          New-Item -ItemType Directory -Force -Path release-assets
-          $file = Get-ChildItem -Path src-tauri\target -Recurse -File | Where-Object { $_.Name -match "(exe|msi|msix|nsis)" } | Select-Object -First 1
-          Copy-Item $file.FullName -Destination release-assets\skill-manager-setup.exe
-      - name: Upload Windows asset
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ needs.create_release.outputs.upload_url }}
-          asset_path: release-assets/skill-manager-setup.exe
-          asset_name: skill-manager-setup.exe
-          asset_content_type: application/octet-stream
+          node-version: 22
+          cache: npm
 
-  build-macos:
-    needs: create_release
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
       - name: Setup Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-      - name: Install deps
-        run: npm ci
-      - name: Build frontend + tauri
-        run: |
-          npm run build
-          npx tauri build
-      # Optional macOS signing/notarize removed to avoid secrets usage in workflow expressions
-      - name: Prepare release asset (macOS)
-        run: |
-          mkdir -p release-assets
-          FILE=$(find src-tauri/target -type f -name "*.dmg" -print -quit)
-          if [ -z "$FILE" ]; then
-            FILE=$(find src-tauri/target -type f -name "*mac*" -print -quit)
-          fi
-          cp "$FILE" release-assets/skill-manager-macos.dmg
-      - name: Upload macOS asset
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ needs.create_release.outputs.upload_url }}
-          asset_path: release-assets/skill-manager-macos.dmg
-          asset_name: skill-manager-macos.dmg
-          asset_content_type: application/octet-stream
+        uses: dtolnay/rust-toolchain@stable
 
-  publish-manifest:
-    needs: [build-linux, build-windows, build-macos]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Create latest.json
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify updater signing key
+        shell: pwsh
+        env:
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
         run: |
-          mkdir -p release-assets
-          TAG=${{ github.ref_name }}
-          REPO=${{ github.repository }}
-          PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          echo "{\"version\":\"$TAG\",\"notes\":\"Release $TAG\",\"pub_date\":\"$PUB_DATE\",\"platforms\":{\"windows\":{\"url\":\"https://github.com/$REPO/releases/download/$TAG/skill-manager-setup.exe\"},\"macos\":{\"url\":\"https://github.com/$REPO/releases/download/$TAG/skill-manager-macos.dmg\"},\"linux\":{\"url\":\"https://github.com/$REPO/releases/download/$TAG/skill-manager-linux.AppImage\"}}}" > release-assets/latest.json
-      - name: Upload latest.json
-        uses: actions/upload-release-asset@v1
+          if ([string]::IsNullOrWhiteSpace($env:TAURI_PRIVATE_KEY)) {
+            throw "GitHub Secret TAURI_PRIVATE_KEY is required to sign updater artifacts."
+          }
+
+      - name: Build and publish release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         with:
-          upload_url: ${{ needs.create_release.outputs.upload_url }}
-          asset_path: release-assets/latest.json
-          asset_name: latest.json
-          asset_content_type: application/json
+          tagName: ${{ github.ref_name }}
+          releaseName: "技能管理器 ${{ github.ref_name }}"
+          releaseBody: "请查看本版本附带的安装包和自动更新包。"
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true
