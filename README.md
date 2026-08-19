@@ -18,7 +18,7 @@ npx tauri signer generate -w $env:USERPROFILE\.tauri\skill-manager.key
 
 1. 将命令输出的公钥写入 `src-tauri/tauri.conf.json` 的 `tauri.updater.pubkey`。
 2. 将私钥文件完整内容保存为 GitHub Secret `TAURI_PRIVATE_KEY`。
-3. 若生成密钥时设置了密码，将密码保存为 GitHub Secret `TAURI_KEY_PASSWORD`；无密码时创建空值即可。
+3. 若生成密钥时设置了密码，将密码保存为 GitHub Secret `TAURI_KEY_PASSWORD`；无密码时无需创建。
 
 私钥不可提交到仓库。当前配置中的公钥必须与 GitHub Secret 中的私钥配对，否则客户端会拒绝安装更新。
 
@@ -33,8 +33,8 @@ npx tauri signer generate -w $env:USERPROFILE\.tauri\skill-manager.key
 提交后创建并推送同版本标签：
 
 ```bash
-git tag v0.1.1
-git push origin v0.1.1
+git tag v0.1.2
+git push origin v0.1.2
 ```
 
 工作流会创建 GitHub Release，并上传 MSI、updater 签名包及 `latest.json`。

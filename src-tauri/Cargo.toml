@@ -1,6 +1,6 @@
 [package]
 name = "codex-skill-manager"
-version = "0.1.1"
+version = "0.1.2"
 description = "Desktop GUI for managing Codex and Claude Code skills"
 authors = ["OpenAI Codex"]
 license = ""

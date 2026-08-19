@@ -8,7 +8,7 @@
   },
   "package": {
     "productName": "技能管理器",
-    "version": "0.1.1"
+    "version": "0.1.2"
   },
   "tauri": {
     "bundle": {
@@ -48,7 +48,7 @@
     "updater": {
       "active": true,
       "dialog": false,
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEZBQ0M3REJFOEQzODhDRTAKUldUZ2pEaU52bjNNK2xiMFNNQjAzTVZVVEJVMkhCd1p6WHBIRGJGeEJDV2ljcEQxeFFSeStPOWwK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQ0RkQ5MTcxRjlBRUM0OTkKUldTWnhLNzVjWkg5UkxvUnc0ZDNLOGtucFNDREYyeWFkazk1NVBWWVBVb2s5R2JOanpmRUVOSmYK",
       "endpoints": [
         "https://github.com/yansunling/skill_desktop/releases/latest/download/latest.json"
       ]
