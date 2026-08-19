@@ -33,8 +33,8 @@ npx tauri signer generate -w $env:USERPROFILE\.tauri\skill-manager.key
 提交后创建并推送同版本标签：
 
 ```bash
-git tag v0.1.2
-git push origin v0.1.2
+git tag v0.1.3
+git push origin v0.1.3
 ```
 
 工作流会创建 GitHub Release，并上传 MSI、updater 签名包及 `latest.json`。

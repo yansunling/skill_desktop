@@ -48,4 +48,44 @@ jobs:
           releaseBody: "请查看本版本附带的安装包和自动更新包。"
           releaseDraft: false
           prerelease: false
-          includeUpdaterJson: true
+
+      - name: Publish updater manifest
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $version = (Get-Content -Raw package.json | ConvertFrom-Json).version
+          $bundleDirectory = "src-tauri/target/release/bundle/msi"
+          $archive = Get-ChildItem $bundleDirectory -Filter "*.msi.zip" | Select-Object -First 1
+          if (-not $archive) {
+            throw "Updater archive was not generated."
+          }
+
+          $signaturePath = "$($archive.FullName).sig"
+          if (-not (Test-Path -LiteralPath $signaturePath)) {
+            throw "Updater signature was not generated."
+          }
+
+          $releaseDirectory = New-Item -ItemType Directory -Force -Path "release-assets"
+          $assetName = "skill-manager_${version}_x64.msi.zip"
+          $assetPath = Join-Path $releaseDirectory.FullName $assetName
+          $signatureAssetPath = "$assetPath.sig"
+          Copy-Item -LiteralPath $archive.FullName -Destination $assetPath
+          Copy-Item -LiteralPath $signaturePath -Destination $signatureAssetPath
+
+          $manifest = [ordered]@{
+            version = $version
+            notes = "Release $env:GITHUB_REF_NAME"
+            pub_date = [DateTimeOffset]::UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")
+            platforms = [ordered]@{
+              "windows-x86_64" = [ordered]@{
+                signature = (Get-Content -Raw -LiteralPath $signaturePath).Trim()
+                url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:GITHUB_REF_NAME/$assetName"
+              }
+            }
+          }
+          $manifestPath = Join-Path $releaseDirectory.FullName "latest.json"
+          $manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $manifestPath -Encoding utf8
+
+          gh release upload $env:GITHUB_REF_NAME $assetPath $signatureAssetPath $manifestPath `
+            --repo $env:GITHUB_REPOSITORY --clobber
